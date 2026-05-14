@@ -7,7 +7,9 @@ Automatically sets the split direction based on each window's dimensions using a
 ## Dependencies
 
 - i3
-- libcjson (`sudo apt install libcjson-dev`)
+- gcc
+
+cJSON is vendored — no external libraries needed.
 
 ## Build & Install
 
@@ -15,6 +17,8 @@ Automatically sets the split direction based on each window's dimensions using a
 make
 sudo make install
 ```
+
+Or download the pre-built binary from the [releases page](../../releases).
 
 ## Usage
 
