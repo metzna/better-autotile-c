@@ -85,14 +85,28 @@ static int ipc_connect(void) {
     return fd;
 }
 
+static bool write_all(int fd, const void *buf, size_t n) {
+    const char *p = buf;
+    while (n > 0) {
+        ssize_t r = write(fd, p, n);
+        if (r <= 0) return false;
+        p += r;
+        n -= (size_t)r;
+    }
+    return true;
+}
+
 static void ipc_send(int fd, uint32_t type, const char *payload) {
     uint32_t len = payload ? (uint32_t)strlen(payload) : 0;
     char hdr[I3_HEADER_SIZE];
     memcpy(hdr,                    I3_MAGIC, I3_MAGIC_LEN);
     memcpy(hdr + I3_MAGIC_LEN,     &len,     4);
     memcpy(hdr + I3_MAGIC_LEN + 4, &type,    4);
-    write(fd, hdr, I3_HEADER_SIZE);
-    if (len) write(fd, payload, len);
+    if (!write_all(fd, hdr, I3_HEADER_SIZE) ||
+        (len && !write_all(fd, payload, len))) {
+        fprintf(stderr, "ipc_send: write failed\n");
+        exit(1);
+    }
 }
 
 static char *ipc_recv(int fd, uint32_t *type_out) {
@@ -108,6 +122,7 @@ static char *ipc_recv(int fd, uint32_t *type_out) {
     memcpy(&len,  hdr + I3_MAGIC_LEN,     4);
     memcpy(&type, hdr + I3_MAGIC_LEN + 4, 4);
     if (type_out) *type_out = type;
+    if (len > 64 * 1024 * 1024) return NULL;  /* sanity cap: 64 MB */
     char *buf = malloc(len + 1);
     if (!buf) return NULL;
     n = 0;
@@ -118,6 +133,19 @@ static char *ipc_recv(int fd, uint32_t *type_out) {
     }
     buf[len] = '\0';
     return buf;
+}
+
+/* ── Safe rect extraction ────────────────────────────────────────────────── */
+
+static bool get_rect(cJSON *con, double *w, double *h) {
+    cJSON *rect = cJSON_GetObjectItem(con, "rect");
+    if (!rect) return false;
+    cJSON *cw = cJSON_GetObjectItem(rect, "width");
+    cJSON *ch = cJSON_GetObjectItem(rect, "height");
+    if (!cw || !ch) return false;
+    *w = cw->valuedouble;
+    *h = ch->valuedouble;
+    return true;
 }
 
 /* ── Command helpers ─────────────────────────────────────────────────────── */
@@ -246,9 +274,8 @@ static bool should_skip(cJSON *con, cJSON *tree) {
 static void on_focus(cJSON *con) {
     double id   = node_id(con);
     cJSON *name = cJSON_GetObjectItem(con, "name");
-    cJSON *rect = cJSON_GetObjectItem(con, "rect");
-    double w    = cJSON_GetObjectItem(rect, "width")->valuedouble;
-    double h    = cJSON_GetObjectItem(rect, "height")->valuedouble;
+    double w, h;
+    if (!get_rect(con, &w, &h)) { LOG("\n[FOCUS] id=%.0f — missing rect, skip\n", id); return; }
     LOG("\n[FOCUS] '%s' id=%.0f rect=%.0fx%.0f\n",
         name ? name->valuestring : "?", id, w, h);
 
@@ -297,9 +324,12 @@ static void on_new(cJSON *event_con) {
 
     double b_id  = node_id(b);
     cJSON *b_name = cJSON_GetObjectItem(b, "name");
-    cJSON *b_rect = cJSON_GetObjectItem(b, "rect");
-    double bw    = cJSON_GetObjectItem(b_rect, "width")->valuedouble;
-    double bh    = cJSON_GetObjectItem(b_rect, "height")->valuedouble;
+    double bw, bh;
+    if (!get_rect(b, &bw, &bh)) {
+        LOG("  → b missing rect, abort\n");
+        cJSON_Delete(tree);
+        return;
+    }
     LOG("  b='%s' id=%.0f rect=%.0fx%.0f\n",
         b_name ? b_name->valuestring : "?", b_id, bw, bh);
 
@@ -331,9 +361,8 @@ static void on_new(cJSON *event_con) {
     if (!tree) return;
     c = find_by_id(tree, c_id);
     if (c && !should_skip(c, tree)) {
-        cJSON *c_rect    = cJSON_GetObjectItem(c, "rect");
-        double cw        = cJSON_GetObjectItem(c_rect, "width")->valuedouble;
-        double ch        = cJSON_GetObjectItem(c_rect, "height")->valuedouble;
+        double cw, ch;
+        if (!get_rect(c, &cw, &ch)) { cJSON_Delete(tree); return; }
         const char *new_mark = (ch > cw) ? MARK_V : MARK_H;
         LOG("  → remark c: rect=%.0fx%.0f → %s\n", cw, ch, new_mark);
         run_cmd("unmark " MARK_V);
