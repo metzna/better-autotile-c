@@ -13,6 +13,8 @@
 
 /* ── i3 IPC constants ────────────────────────────────────────────────────── */
 
+#define VERSION         "0.1.0"
+
 #define I3_MAGIC        "i3-ipc"
 #define I3_MAGIC_LEN    6
 #define I3_HEADER_SIZE  14      /* magic(6) + len(4) + type(4) */
@@ -347,19 +349,21 @@ static void on_new(cJSON *event_con) {
 
 int main(int argc, char *argv[]) {
     static const struct option long_opts[] = {
-        { "debug", no_argument, NULL, 'd' },
-        { "help",  no_argument, NULL, 'h' },
+        { "debug",   no_argument, NULL, 'd' },
+        { "version", no_argument, NULL, 'v' },
+        { "help",    no_argument, NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
     int opt;
-    while ((opt = getopt_long(argc, argv, "dh", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "dvh", long_opts, NULL)) != -1) {
         switch (opt) {
         case 'd': g_debug = true; break;
+        case 'v': printf("better_autotile %s\n", VERSION); return 0;
         case 'h':
-            printf("Usage: better_autotile [-d|--debug]\n");
+            printf("Usage: better_autotile [-d|--debug] [-v|--version]\n");
             return 0;
         default:
-            fprintf(stderr, "Usage: better_autotile [-d|--debug]\n");
+            fprintf(stderr, "Usage: better_autotile [-d|--debug] [-v|--version]\n");
             return 1;
         }
     }
