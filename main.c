@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <getopt.h>
-#include <cjson/cJSON.h>
+#include "vendor/cJSON.h"
 
 /* ── i3 IPC constants ────────────────────────────────────────────────────── */
 
