@@ -13,7 +13,7 @@
 
 /* ── i3 IPC constants ────────────────────────────────────────────────────── */
 
-#define VERSION         "0.1.0"
+#define VERSION         "0.1.1"
 
 #define I3_MAGIC        "i3-ipc"
 #define I3_MAGIC_LEN    6
